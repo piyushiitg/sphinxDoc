@@ -1,0 +1,534 @@
+Introduction:
+Pytest is one of the recommended framework to write unit test cases. A general unittest model that Python unittest frameworks use has following structure:
+
+1: Setup section: Gets executed at the start of every testcase/testscript based on the scope. This mainly has the steps to prepare the setup for execution of the testcase.
+
+2: Testcases: Actual steps to test the code
+
+3: Teardown section: Gets executed at the end of every testcase/testscript based on the scope. This mainly should have the steps to revert the setup that was created in setup section.
+
+Getting Started:
+
+To install pytest run following command:
+
+pip install pytest
+
+
+Check if pytest is installed correctly using following command:
+
+[root@10 ~]# py.test --version
+This is pytest version 2.9.2, imported from /usr/local/lib/python2.7/site-packages/pytest.pyc
+
+
+
+How do we write a testcase?
+
+Suppose we have a simple method to test if given number is prime or not which is as follows:
+
+class PrimeTest:
+    def is_prime(self,number):
+        """Return True if *number* is prime."""
+        for element in range(2, number):
+            if number % element == 0:
+                return False
+        return True
+
+
+
+This method returns true if number is prime and false otherwise. Now the unitest case for this can be written as follows:
+
+from primetest import PrimeTest
+def test_is_prime():
+    """UT for is_prime"""
+    obj = PrimeTest()
+    assert(obj.is_prime(5))
+
+
+
+
+Simple as that! 
+
+How do we execute this using pytest?
+
+To execute above test run following command:
+
+ py.test test_pytest_example.py
+
+"test_pytest_example.py" being the file that contains unit testcase mentioned above. This will result in following output.
+
+[root@TA_Server ut]# py.test test_pytest_example.py
+========================================================== test session starts ===========================================================
+platform linux2 -- Python 2.7.6, pytest-2.9.2, py-1.4.31, pluggy-0.3.1
+rootdir: /home/ut/ut, inifile:
+plugins: xdist-1.14
+collected 1 items
+test_pytest_example.py .
+======================================================== 1 passed in 0.01 seconds ========================================================
+How does pytest discover testcases?
+
+Pytest considers "test_" prefixed methods or functions present in that file.
+
+If we want to provide a directory then pytest looks for all the files of format "test_*.py" and executes methods within them.
+
+By default, it checks all the sub directories too. If we want to skip any of the directory that can be done by specifying it in the pytest.ini file.
+
+Note: Pytest can also execute all the testcases that are written in unittest/nosetest framework.
+
+Reporting:
+
+A detailed report can be seen using verbose command line option as shown below. We will add one more testcase to show how the failure is reported.
+
+from primetest import PrimeTest
+def test_is_prime():
+    """UT for is_prime"""
+    obj = PrimeTest()
+    assert(obj.is_prime(5))
+def test_fail():
+    """UT to demonstrate failure"""
+    assert 1==0
+
+
+
+[root@TA_Server ut]# py.test  -v test_pytest_example.py
+========================================================== test session starts ===========================================================
+platform linux2 -- Python 2.7.6, pytest-2.9.2, py-1.4.31, pluggy-0.3.1 -- /usr/local/bin/python2.7
+cachedir: .cache
+rootdir: /home/ut/ut, inifile:
+plugins: xdist-1.14
+collected 2 items
+test_pytest_example.py::test_is_prime PASSED
+test_pytest_example.py::test_fail FAILED
+================================================================ FAILURES ================================================================
+_______________________________________________________________ test_fail ________________________________________________________________
+    def test_fail():
+>       assert 1==0
+E       assert 1 == 0
+test_pytest_example.py:9: AssertionError
+=================================================== 1 failed, 1 passed in 0.02 seconds ===================================================
+
+
+Pytest fixtures:
+
+As we mentioned above,  we also need to have setup/teardown sections that can be executed before and after the testcases are executed respectively. For that, we need to have methods defined as fixtures.
+
+import pytest
+from primetest import PrimeTest
+from pytest import fixture
+import logging
+import sys
+
+logger =  logging.getLogger()
+logging.basicConfig(format="%(asctime)s; %(message)s", level=logging.INFO, filename="pytest.log")
+@pytest.fixture
+def pytest_setup(request):
+    """ Setup"""
+    logger.info("Inside setup")
+    def pytest_teardown():
+        """Teardown"""
+        logger.info("Inside teardown")
+    request.addfinalizer(pytest_teardown)
+def test_is_prime(pytest_setup):
+    """UT for is_prime"""
+    obj = PrimeTest()
+    assert(obj.is_prime(5))
+def test_fail(pytest_setup):
+    """UT to demonstrate failure"""
+    assert 1==0
+
+
+
+In above example, we have a method pytest_setup and to define it as fixture we have added a decorator @pytest.fixture to it. Now, we need to pass this method as an argument to all the testcases before which we need to call this method. 
+
+Teardown is slightly coupled with setup here. For a method to be executed after a testcase is done, we need to call it using request.addfinalizer. 
+
+Log file will have following entry:
+
+2016-08-03 13:21:54,435; Inside setup
+2016-08-03 13:21:54,436; Inside teardown
+2016-08-03 13:21:54,437; Inside setup
+2016-08-03 13:21:54,443; Inside teardown
+
+This shows that the setup/teardown was called before/after each testcase. 
+
+If we want that the fixture (setup/teardown in this case) should be executed only at the start of testscript then that can be done by defining scope of that fixture.
+
+import pytest
+from primetest import PrimeTest
+from pytest import fixture
+import logging
+import sys
+logger =  logging.getLogger()
+logging.basicConfig(format="%(asctime)s; %(message)s", level=logging.INFO, filename="pytest.log")
+@pytest.fixture(scope="module")
+def pytest_setup(request):
+    """ Setup"""
+    logger.info("Inside setup")
+    def pytest_teardown():
+        """Teardown"""
+        logger.info("Inside teardown")
+    request.addfinalizer(pytest_teardown)
+def test_is_prime(pytest_setup):
+    """UT for is_prime"""
+    obj = PrimeTest()
+    assert(obj.is_prime(5))
+def test_fail(pytest_setup):
+    """UT to demonstrate failure"""
+    assert 1==0
+
+
+
+This will execute setup and teardown only once. Scope can be function/module/package. 
+
+2016-08-04 11:56:16,031; Inside setup
+2016-08-04 11:56:16,039; Inside teardown
+
+Multiple fixtures can be called on a testcase by passing the fixtures to testcase.
+
+import pytest
+from primetest import PrimeTest
+from pytest import fixture
+import logging
+import sys
+logger =  logging.getLogger()
+logging.basicConfig(format="%(asctime)s; %(message)s", level=logging.INFO, filename="pytest.log")
+@pytest.fixture(scope="module")
+def pytest_setup(request):
+    """ Setup"""
+    logger.info("Inside setup")
+    def pytest_teardown():
+        """Teardown"""
+        logger.info("Inside teardown")
+    request.addfinalizer(pytest_teardown)
+@pytest.fixture
+def pytest_a():
+    """Just another fixture"""
+    logger.info("Just another fixture")
+def test_is_prime(pytest_setup, pytest_a):
+    """UT for is_prime"""
+    obj = PrimeTest()
+    assert(obj.is_prime(5))
+def test_fail(pytest_setup):
+    """UT to demonstrate failure"""
+    assert 1==0
+
+
+
+Output:
+
+2016-08-04 11:57:44,200; Inside setup
+2016-08-04 11:57:44,200; Just another fixture
+2016-08-04 11:57:44,208; Inside teardown
+
+
+
+This gives the benefit of controlling what needs to be called on a testcase. If we have multiple cases and one of the testcase does not need the fixture to be called, we can do that by not passing the fixture to the testcase.
+
+Skip and xfail: Dealing with test that cannot succeed
+
+The simplest way to skip a function is to mark it with skip decorator. 
+
+import pytest
+from primetest import PrimeTest
+from pytest import fixture
+import logging
+import sys
+
+logger =  logging.getLogger()
+logging.basicConfig(format="%(asctime)s; %(message)s", level=logging.INFO, filename="pytest.log")
+
+@pytest.fixture(scope="module")
+def pytest_setup(request):
+    """ Setup"""
+    logger.info("Inside setup")
+    def pytest_teardown():
+        """Teardown"""
+        logger.info("Inside teardown")
+    request.addfinalizer(pytest_teardown)
+
+@pytest.fixture
+def pytest_a():
+    """Just another fixture"""
+    logger.info("Just another fixture")
+
+@pytest.mark.skip(reason="Test skip functionality")
+def test_is_prime(pytest_setup, pytest_a):
+    """UT for is_prime"""
+    obj = PrimeTest()
+    assert(obj.is_prime(5))
+
+def test_fail(pytest_setup):
+    """UT to demonstrate failure"""
+    assert 1==0
+
+
+Output:
+
+[root@TA_Server ut]# py.test -rs test_pytest_example.py
+========================================================== test session starts ==========================================================
+platform linux2 -- Python 2.7.6, pytest-2.9.2, py-1.4.31, pluggy-0.3.1
+rootdir: /home/ut/ut, inifile: pytest.ini
+plugins: xdist-1.14
+collected 2 items
+test_complete.py sF
+======================================================== short test summary info ========================================================
+SKIP [1] test_complete.py:23: Test skip functionality
+=============================================================== FAILURES ================================================================
+_______________________________________________________________ test_fail _______________________________________________________________
+pytest_setup = None
+    def test_fail(pytest_setup):
+        """UT to demonstrate failure"""
+>       assert 1==0
+E       assert 1 == 0
+test_complete.py:32: AssertionError
+================================================== 1 failed, 1 skipped in 0.03 seconds ==================================================
+If we want to skip some cases based on some condition then we can use skipif.
+
+import pytest
+from primetest import PrimeTest
+from pytest import fixture
+import logging
+import sys
+
+logger =  logging.getLogger()
+logging.basicConfig(format="%(asctime)s; %(message)s", level=logging.INFO, filename="pytest.log")
+
+@pytest.fixture(scope="module")
+def pytest_setup(request):
+    """ Setup"""
+    logger.info("Inside setup")
+    def pytest_teardown():
+        """Teardown"""
+        logger.info("Inside teardown")
+    request.addfinalizer(pytest_teardown)
+
+@pytest.fixture
+def pytest_a():
+    """Just another fixture"""
+    logger.info("Just another fixture")
+
+@pytest.mark.skipif(sys.version_info < (3,3),
+                    reason="Required python 3.3")
+def test_is_prime(pytest_setup, pytest_a):
+    """UT for is_prime"""
+    obj = PrimeTest()
+    assert(obj.is_prime(5))
+
+def test_fail(pytest_setup):
+    """UT to demonstrate failure"""
+    assert 1==0
+
+
+Output:
+
+[root@TA_Server ut]# py.test -rs test_pytest_example.py
+
+========================================================== test session starts ==========================================================
+platform linux2 -- Python 2.7.6, pytest-2.9.2, py-1.4.31, pluggy-0.3.1
+rootdir: /home/ut/ut, inifile: pytest.ini
+plugins: xdist-1.14
+collected 2 items
+
+test_complete.py sF
+======================================================== short test summary info ========================================================
+SKIP [1] test_complete.py:23: Required python 3.3
+
+=============================================================== FAILURES ================================================================
+_______________________________________________________________ test_fail _______________________________________________________________
+
+pytest_setup = None
+
+    def test_fail(pytest_setup):
+        """UT to demonstrate failure"""
+>       assert 1==0
+E       assert 1 == 0
+
+test_complete.py:33: AssertionError
+================================================== 1 failed, 1 skipped in 0.03 seconds ==================================================
+
+A testcase is marked as xfail when the testcase can be executed but is expected to fail due to some reason (for instance: implementation is not complete).
+
+import pytest
+from primetest import PrimeTest
+from pytest import fixture
+import logging
+import sys
+
+logger =  logging.getLogger()
+logging.basicConfig(format="%(asctime)s; %(message)s", level=logging.INFO, filename="pytest.log")
+
+@pytest.fixture(scope="module")
+def pytest_setup(request):
+    """ Setup"""
+    logger.info("Inside setup")
+    def pytest_teardown():
+        """Teardown"""
+        logger.info("Inside teardown")
+    request.addfinalizer(pytest_teardown)
+
+@pytest.fixture
+def pytest_a():
+    """Just another fixture"""
+    logger.info("Just another fixture")
+
+@pytest.mark.xfail(reason="Test to show xfail functionality")
+def test_is_prime(pytest_setup, pytest_a):
+    """UT for is_prime"""
+    obj = PrimeTest()
+    assert(obj.is_prime(5))
+
+def test_fail(pytest_setup):
+    """UT to demonstrate failure"""
+    assert 1==0
+
+
+
+
+Output:
+
+[root@TA_Server ut]# py.test -vrx test_pytest_example.py
+
+========================================================== test session starts ==========================================================
+platform linux2 -- Python 2.7.6, pytest-2.9.2, py-1.4.31, pluggy-0.3.1 -- /usr/local/bin/python2.7
+cachedir: .cache
+rootdir: /home/ut/ut, inifile: pytest.ini
+plugins: xdist-1.14
+collected 2 items
+
+test_complete.py::test_is_prime XPASS
+test_complete.py::test_fail FAILED
+
+=============================================================== FAILURES ================================================================
+_______________________________________________________________ test_fail _______________________________________________________________
+
+pytest_setup = None
+
+    def test_fail(pytest_setup):
+        """UT to demonstrate failure"""
+>       assert 1==0
+E       assert 1 == 0
+
+test_complete.py:32: AssertionError
+================================================== 1 failed, 1 xpassed in 0.03 seconds ==================================================
+We can run a particular set of testcases by marking them with custom markers.
+
+import pytest
+from primetest import PrimeTest
+from pytest import fixture
+import logging
+import sys
+
+logger =  logging.getLogger()
+logging.basicConfig(format="%(asctime)s; %(message)s", level=logging.INFO, filename="pytest.log")
+
+@pytest.fixture(scope="module")
+def pytest_setup(request):
+    """ Setup"""
+    logger.info("Inside setup")
+    def pytest_teardown():
+        """Teardown"""
+        logger.info("Inside teardown")
+    request.addfinalizer(pytest_teardown)
+
+@pytest.fixture
+def pytest_a():
+    """Just another fixture"""
+    logger.info("Just another fixture")
+
+@pytest.mark.custom
+def test_is_prime(pytest_setup, pytest_a):
+    """UT for is_prime"""
+    obj = PrimeTest()
+    assert(obj.is_prime(5))
+
+def test_fail(pytest_setup):
+    """UT to demonstrate failure"""
+    assert 1==0
+
+
+Output:
+
+[root@TA_Server ut]# py.test -vm custom test_pytest_example.py
+
+========================================================== test session starts ==========================================================
+platform linux2 -- Python 2.7.6, pytest-2.9.2, py-1.4.31, pluggy-0.3.1 -- /usr/local/bin/python2.7
+cachedir: .cache
+rootdir: /home/ut/ut, inifile: pytest.ini
+plugins: xdist-1.14
+collected 2 items
+
+test_complete.py::test_is_prime PASSED
+
+================================================== 1 tests deselected by "-m 'custom'" ==================================================
+================================================ 1 passed, 1 deselected in 0.02 seconds =================================================
+Configuration file:
+
+Providing all the required command line options every-time we run pytest can be tedious. We can add all the command line options in Pytest.ini file under [pytest] section.
+
+[pytest]
+addopts = --maxfail=2 -rf  # exit after 2 failures, report fail info
+Pytest Plugins:
+
+Here is the list of all the plugins supported by Pytest. Installing a plugin is easily done using pip. 
+
+If we want to terminate cases after timeout then we can use pytest's timeout plugin.  To install this plugin just run pip install pytest-timeout.
+
+Timeout can be specified globally as well as per testcase level.  Testcase level timeout will over ride global timeout.
+
+A timeout is always specified as an integer number of seconds and can be defined in a number of ways, from low to high priority:
+
+You can set a global timeout in the py.test configuration file using the timeout option. E.g.:
+
+[pytest]
+timeout = 300
+The PYTEST_TIMEOUT environment variable sets a global timeout overriding a possible value in the configuration file.
+
+The --timeout command line option sets a global timeout overriding both the environment variable and configuration option.
+
+Using the timeout marker on test items you can specify timeouts on a per-item basis:
+
+@pytest.mark.timeout(300)
+def test_foo():
+    pass
+Setting a timeout to 0 seconds disables the timeout, so if you have a global timeout set you can still disable the timeout by using the mark.
+
+Following is an example of how a timeout can be set on global and per testcase level.
+
+INI file:
+
+[pytest]
+timeout = 3
+addopts = -v
+
+Global timeout for all cases is set as 3 seconds.
+
+import pytest
+import time
+
+def test_foo():
+    time.sleep(4)
+    pass
+@pytest.mark.timeout(6)
+def test_foo_1():
+    time.sleep(5)
+    pass
+
+
+
+As shown, test_foo_1 has a timeout of 6 seconds so this testcase will override the global timeout. Following is the output:
+
+[root@TA_Server ut]# py.test test_timeout.py
+========================================================== test session starts ==========================================================
+platform linux2 -- Python 2.7.6, pytest-2.9.2, py-1.4.31, pluggy-0.3.1 -- /usr/local/bin/python2.7
+cachedir: .cache
+rootdir: /home/ut, inifile: pytest.ini
+plugins: xdist-1.14, pep8-1.0.6, timeout-1.0.0
+collected 2 items
+test_timeout.py::test_foo FAILED
+test_timeout.py::test_foo_1 PASSED
+=============================================================== FAILURES ================================================================
+_______________________________________________________________ test_foo ________________________________________________________________
+    def test_foo():
+>       time.sleep(4)
+E       Failed: Timeout >3s
+test_timeout.py:6: Failed
+================================================== 1 failed, 1 passed in 8.02 seconds ===================================================
